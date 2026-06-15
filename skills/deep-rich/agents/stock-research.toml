@@ -19,7 +19,7 @@ Expect:
 
 1. Run `python3 scripts/dr.py fundamentals <SYM>` — valuation, financials
 2. Run `python3 scripts/dr.py health <SYM>` — health grade and signals
-3. Use `web_search` for recent news and disruption risk (do **not** use `dr.py news`)
+3. Use `web_search` for recent news and disruption risk
 4. Check portfolio position via `python3 scripts/dr.py portfolio` — held? allocation?
 5. Check deployment plan via `python3 scripts/dr.py deployment` — asset class underweight?
 

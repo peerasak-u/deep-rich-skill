@@ -44,7 +44,7 @@ uv run skills/deep-rich/scripts/signals.py --home /path/to/deep-rich --json
 ### Workflow References
 
 Detailed command docs live in `skills/deep-rich/references/commands/`:
-`analyze`, `briefing`, `dashboard`, `deploy`, `deployment`, `doctor`, `fundamentals`, `goals`, `health`, `journal`, `news`, `onboard`, `performance`, `portfolio`, `prices`, `rebalance`, `research`, `review`, `risk`, `summary`.
+`analyze`, `briefing`, `dashboard`, `deploy`, `deployment`, `doctor`, `fundamentals`, `goals`, `health`, `journal`, `onboard`, `performance`, `portfolio`, `prices`, `rebalance`, `research`, `review`, `risk`, `summary`.
 
 ## Usage
 

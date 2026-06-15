@@ -32,7 +32,7 @@ Note any big moves (>5% in a day or since last check).
 
 ### Step 3: Search news for YOUR holdings
 
-Use agentic tools per [AGENTIC-NEWS](../AGENTIC-NEWS.md) — not `dr.py news`.
+Use agentic tools per [AGENTIC-NEWS](../AGENTIC-NEWS.md).
 
 Briefing-specific filters:
 

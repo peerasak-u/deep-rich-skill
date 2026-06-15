@@ -1,8 +1,6 @@
 # Agentic News Discovery
 
-**Use the agent's native tools for news — not `dr.py news` or `scripts/news.py`.** Those RSS/keyword paths are deprecated.
-
-Modern models can search multiple sources, read full articles, and adapt to context. Use that instead of brittle keyword matching.
+Use the agent's native tools for news. Modern models can search multiple sources, read full articles, and adapt to context.
 
 ## Default: `web_search`
 
