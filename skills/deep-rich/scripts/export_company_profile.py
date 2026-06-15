@@ -21,7 +21,6 @@ from pathlib import Path
 
 from _common import resolve_deep_rich_home
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -52,13 +51,79 @@ def _fmt_currency(value: float, currency: str = "USD", decimals: int = 2) -> str
     return f"{symbol}{fmt.format(value)}"
 
 
-def _fmt_large(value: float) -> str:
-    """Format large dollar amounts with B/M suffix."""
+def _fmt_large(value: float, currency: str = "USD") -> str:
+    """Format large amounts with B/M suffix."""
+    symbol = {"USD": "$", "THB": "฿", "EUR": "€", "GBP": "£"}.get(currency, currency + " ")
     if abs(value) >= 1_000_000_000:
-        return f"${value / 1_000_000_000:.2f}B"
+        return f"{symbol}{value / 1_000_000_000:.2f}B"
     if abs(value) >= 1_000_000:
-        return f"${value / 1_000_000:.1f}M"
-    return f"${value:,.0f}"
+        return f"{symbol}{value / 1_000_000:.1f}M"
+    return f"{symbol}{value:,.0f}"
+
+
+def _profile_currency(fin: dict) -> str:
+    return fin.get("currency", "USD")
+
+
+def _growth_read(pct: float) -> str:
+    if pct > 15:
+        return "Strong growth"
+    if pct > 0:
+        return "Moderate growth"
+    if pct > -10:
+        return "Slight decline"
+    return "Material decline"
+
+
+def _normalize_list_items(items: list) -> list[str]:
+    """Accept plain strings or dict rows from heterogeneous company JSON."""
+    out: list[str] = []
+    for item in items:
+        if isinstance(item, str):
+            out.append(item)
+        elif isinstance(item, dict):
+            out.append(
+                item.get("risk")
+                or item.get("catalyst")
+                or item.get("text")
+                or item.get("description")
+                or item.get("summary")
+                or ""
+            )
+    return [x for x in out if x]
+
+
+def _revenue_growth_yoy(fin: dict) -> float | None:
+    for key in ("fy2025_revenue_growth_yoy", "revenue_growth_yoy", "revenue_growth_yoy_2025"):
+        if key in fin:
+            return fin[key]
+    return None
+
+
+def _fmt_revenue(fin: dict) -> str | None:
+    currency = _profile_currency(fin)
+    if fin.get("fy2025_revenue"):
+        return _fmt_large(fin["fy2025_revenue"], currency)
+    if fin.get("revenue_fy2025_m_thb"):
+        return f"฿{fin['revenue_fy2025_m_thb']:,.0f}M"
+    if fin.get("revenue_2025"):
+        return f"฿{fin['revenue_2025']:,.0f}M"
+    return None
+
+
+def _cost_per_share(pos: dict, fin: dict, qty: float) -> tuple[float, str]:
+    currency = _profile_currency(fin)
+    if currency == "THB":
+        cost = pos.get("cost_per_share") or pos.get("cost_basis_thb", 0)
+        if qty and cost > 1000:
+            cost = pos.get("cost_per_share") or (pos.get("cost_basis_thb", 0) / qty)
+        return cost, "THB"
+    cost = pos.get("cost_basis_usd") or pos.get("cost_per_share", 0)
+    return cost, "USD"
+
+
+def _position_gain_pct(pos: dict) -> float:
+    return pos.get("unrealized_gain_pct", pos.get("gain_loss_pct", 0)) or 0
 
 
 def _fmt_pct(value: float, sign: bool = True) -> str:
@@ -105,21 +170,21 @@ def _identity_tags(profile: dict) -> str:
     return "".join(parts)
 
 
-def _competitors_table(competitors: list[dict]) -> str:
+def _competitors_table(competitors: list[dict], ticker: str) -> str:
     """Render competitors table HTML."""
     rows = []
     for c in competitors:
         name = _escape(c.get("name", ""))
-        ticker = _escape(c.get("ticker", ""))
+        comp_ticker = _escape(c.get("ticker", ""))
         adv = _escape(c.get("advantage", ""))
         dis = _escape(c.get("disadvantage", ""))
         rows.append(
-            f"<tr><td><strong>{name}</strong><br><small>{ticker}</small></td>"
+            f"<tr><td><strong>{name}</strong><br><small>{comp_ticker}</small></td>"
             f"<td>{adv}</td><td>{dis}</td></tr>"
         )
     return (
-        "<table><thead><tr><th>Competitor</th><th>Advantage vs NET</th>"
-        f"<th>Disadvantage vs NET</th></tr></thead><tbody>{''.join(rows)}</tbody></table>"
+        f"<table><thead><tr><th>Competitor</th><th>Advantage vs {ticker}</th>"
+        f"<th>Disadvantage vs {ticker}</th></tr></thead><tbody>{''.join(rows)}</tbody></table>"
     )
 
 
@@ -127,8 +192,8 @@ def _risks_catalysts(profile: dict) -> str:
     """Render risks + catalysts side-by-side."""
     return (
         '<div class="grid two">'
-        f"<div><h3>Risks</h3>{_li(profile.get('risks', []))}</div>"
-        f"<div><h3>Catalysts</h3>{_li(profile.get('catalysts', []))}</div>"
+        f"<div><h3>Risks</h3>{_li(_normalize_list_items(profile.get('risks', [])))}</div>"
+        f"<div><h3>Catalysts</h3>{_li(_normalize_list_items(profile.get('catalysts', [])))}</div>"
         "</div>"
     )
 
@@ -136,60 +201,249 @@ def _risks_catalysts(profile: dict) -> str:
 def _data_quality(profile: dict) -> str:
     """Render data quality boundary section."""
     dq = profile.get("data_quality", {})
+    missing = dq.get("missing_or_to_verify") or dq.get("unknowns", [])
     return (
         '<div class="grid three">'
         f"<div><h3>Facts</h3>{_li(dq.get('facts', []))}</div>"
         f"<div><h3>Estimates</h3>{_li(dq.get('estimates', []))}</div>"
-        f"<div><h3>Missing / verify</h3>{_li(dq.get('missing_or_to_verify', []))}</div>"
+        f"<div><h3>Missing / verify</h3>{_li(missing)}</div>"
         "</div>"
     )
 
 
 def _business_flow(profile: dict) -> str:
-    """Render the three-node business flow with arrows between nodes."""
-    steps = [
-        ("Internet traffic", "Apps, APIs, employees, AI workloads"),
-        ("Cloudflare edge", "CDN, WAF, DDoS, Zero Trust, Workers"),
-        ("Customer outcome", "Faster, safer, simpler connectivity cloud"),
-    ]
+    """Render the three-node business flow from profile fields."""
+    business = profile.get("business", {})
+    segments = business.get("revenue_segments", [])
+    products = business.get("products", [])
+    pipeline = profile.get("pipeline", [])
+
+    steps: list[tuple[str, str]] = []
+    if segments:
+        detail = segments[1] if len(segments) > 1 else (products[0] if products else "")
+        steps.append((segments[0], detail))
+    if pipeline:
+        item = pipeline[0]
+        steps.append((item.get("name", "Pipeline"), item.get("target_market", item.get("notes", ""))))
+    elif len(products) >= 2:
+        steps.append((products[0], products[1]))
+    if business.get("moat"):
+        steps.append(("Competitive position", business["moat"][:120]))
+    elif len(segments) > 1:
+        steps.append(("Revenue mix", segments[-1]))
+
+    if len(steps) < 2:
+        desc = business.get("description", "See profile")
+        steps = [
+            ("Core business", desc[:100]),
+            (
+                "Products / services",
+                ", ".join(products[:2]) if products else (segments[0] if segments else "See IR"),
+            ),
+            ("Market", profile.get("market", {}).get("tam", "See thesis")[:100]),
+        ]
+
     parts = []
-    for idx, (label, detail) in enumerate(steps):
+    for idx, (label, detail) in enumerate(steps[:3]):
         parts.append(f'<div class="node"><strong>{_escape(label)}</strong><span>{_escape(detail)}</span></div>')
-        if idx < len(steps) - 1:
+        if idx < min(len(steps), 3) - 1:
             parts.append('<div class="arrow">→</div>')
     return "".join(parts)
+
+
+def _health_score(fin: dict) -> int:
+    health = fin.get("health_grade", "C")
+    health_score_map = {"A": 80, "B": 65, "C": 48, "D": 30, "F": 15}
+    return health_score_map.get(health, 48)
+
+
+def _dividend_score(profile: dict) -> int:
+    fin = profile.get("financials", {})
+    val = profile.get("valuation", {})
+    div_yield = val.get("dividend_yield_pct") or fin.get("dividend_yield_2025") or 0
+    return min(90, int(div_yield * 10)) if div_yield else 8
+
+
+def _past_score(fin: dict) -> int:
+    growth = _revenue_growth_yoy(fin)
+    if growth is None:
+        return 48
+    if growth > 15:
+        return 76
+    if growth > 0:
+        return 55
+    if growth > -10:
+        return 40
+    return 25
 
 
 def _evidence_chart(profile: dict) -> dict:
     """Build the Chart.js radar data from profile."""
     fin = profile.get("financials", {})
-    health = fin.get("health_grade", "C")
-    health_score_map = {"A": 80, "B": 65, "C": 48, "D": 30, "F": 15}
-    health_score = health_score_map.get(health, 48)
     return {
         "labels": ["Value", "Future", "Past", "Health", "Dividend"],
-        "values": [42, 82, 76, health_score, 8],
+        "values": [42, 82, _past_score(fin), _health_score(fin), _dividend_score(profile)],
     }
 
 
 def _evidence_fallback(profile: dict) -> str:
     """Build fallback text for the radar chart."""
+    chart = _evidence_chart(profile)
+    vals = chart["values"]
+    return f"Value {vals[0]}, Future {vals[1]}, Past {vals[2]}, Health {vals[3]}, Dividend {vals[4]}."
+
+
+def _evidence_summary(profile: dict) -> str:
     fin = profile.get("financials", {})
+    val = profile.get("valuation", {})
     health = fin.get("health_grade", "C")
-    health_score_map = {"A": 80, "B": 65, "C": 48, "D": 30, "F": 15}
-    hs = health_score_map.get(health, 48)
-    return f"Value 42, Future 82, Past 76, Health {hs}, Dividend 8."
+    div_yield = val.get("dividend_yield_pct") or fin.get("dividend_yield_2025")
+    if div_yield and div_yield >= 3:
+        div_clause = f"meaningful dividend angle (~{div_yield:.1f}% yield),"
+    else:
+        div_clause = "limited dividend profile,"
+    return (
+        "The visual summarizes our current evidence: "
+        f"{div_clause} health grade {health}, "
+        "and valuation treated as a guardrail rather than a fair-value claim."
+    )
 
 
 def _market_cap_label(profile: dict) -> str:
     """Build a market cap label string."""
     fin = profile.get("financials", {})
+    currency = _profile_currency(fin)
+    if fin.get("market_cap"):
+        unit = fin.get("market_cap_unit", "M THB")
+        if "THB" in unit:
+            return f"Market Cap ฿{fin['market_cap']:,.0f}M"
+        return f"Market Cap {_fmt_large(fin['market_cap'] * 1_000_000, currency)}"
     rev = fin.get("fy2025_revenue", 0)
     if rev:
         approx = rev * 40
         if approx >= 1e9:
-            return f"Est. Market Cap ~${approx/1e9:.1f}B"
+            return f"Est. Market Cap ~{_fmt_large(approx, currency)}"
     return "Market Cap N/A"
+
+
+def _past_performance_rows(fin: dict) -> list[tuple[str, str, str]]:
+    currency = _profile_currency(fin)
+    rows: list[tuple[str, str, str]] = []
+    growth = _revenue_growth_yoy(fin)
+    revenue_fmt = _fmt_revenue(fin)
+    if revenue_fmt:
+        rows.append(("FY2025 revenue", revenue_fmt, _growth_read(growth or 0)))
+    if growth is not None:
+        rows.append(("Revenue growth YoY", _fmt_pct(growth), _growth_read(growth)))
+
+    if fin.get("free_cash_flow_q1_2026") is not None:
+        fcf = fin["free_cash_flow_q1_2026"]
+        rows.append(
+            (
+                "Q1 2026 free cash flow",
+                _fmt_large(fcf, currency),
+                "Cash generation improving" if fcf > 0 else "Cash burn",
+            )
+        )
+        if fin.get("free_cash_flow_margin_q1_2026") is not None:
+            margin = fin["free_cash_flow_margin_q1_2026"]
+            rows.append(
+                (
+                    "FCF margin",
+                    _fmt_pct(margin),
+                    "Positive but still maturing" if margin > 0 else "Negative",
+                )
+            )
+    elif fin.get("net_profit_fy2025_m_thb") is not None:
+        np_growth = fin.get("net_profit_growth_yoy")
+        rows.append(
+            (
+                "FY2025 net profit",
+                f"฿{fin['net_profit_fy2025_m_thb']:,.0f}M",
+                _growth_read(np_growth or 0) if np_growth is not None else "Reported net profit",
+            )
+        )
+        if np_growth is not None:
+            rows.append(("Net profit growth YoY", _fmt_pct(np_growth), _growth_read(np_growth)))
+        elif fin.get("ebitda_margin_fy2025_pct") is not None:
+            rows.append(
+                (
+                    "EBITDA margin FY2025",
+                    _fmt_pct(fin["ebitda_margin_fy2025_pct"], sign=False),
+                    "Margin context for cyclical earnings",
+                )
+            )
+    elif fin.get("net_income_2025") is not None:
+        rows.append(("FY2025 net income", f"฿{fin['net_income_2025']:,.0f}M", "Reported net income"))
+
+    return rows[:4]
+
+
+def _past_performance_html(fin: dict) -> str:
+    rows = _past_performance_rows(fin)
+    body = "".join(f"<tr><td>{label}</td><td>{value}</td><td>{read}</td></tr>" for label, value, read in rows)
+    return (
+        "<table><thead><tr><th>Metric</th><th>Value</th><th>Read</th></tr></thead><tbody>"
+        f"{body}</tbody></table>"
+    )
+
+
+def _health_metrics(fin: dict) -> list[tuple[str, str, str | None]]:
+    currency = _profile_currency(fin)
+    metrics: list[tuple[str, str, str | None]] = []
+    de_metric: tuple[str, str, str | None] | None = None
+
+    if fin.get("latest_assets") is not None:
+        metrics.append(("Assets", _fmt_large(fin["latest_assets"], currency), None))
+    if fin.get("latest_liabilities") is not None:
+        metrics.append(("Liabilities", _fmt_large(fin["latest_liabilities"], currency), None))
+    if fin.get("latest_equity") is not None:
+        metrics.append(("Equity", _fmt_large(fin["latest_equity"], currency), None))
+
+    if not metrics:
+        for label, key in (
+            ("ROE FY2025", "roe_fy2025_pct"),
+            ("ROE FY2025", "roe_2025"),
+            ("EBITDA margin", "ebitda_margin_fy2025_pct"),
+            ("Gross margin FY2025", "gross_margin_fy2025_pct"),
+            ("Net margin FY2025", "net_margin_fy2025_pct"),
+        ):
+            if fin.get(key) is not None and not any(m[0] == label for m in metrics):
+                metrics.append((label, _fmt_pct(fin[key], sign=False), None))
+
+    if fin.get("debt_equity") is not None:
+        de = fin["debt_equity"]
+        css = "loss" if de > 1.5 else None
+        de_metric = ("Debt / Equity", f"{de:.2f}x", css)
+
+    if de_metric:
+        metrics = (metrics[:3] + [de_metric]) if len(metrics) >= 3 else metrics + [de_metric]
+
+    return metrics[:4]
+
+
+def _health_html(fin: dict) -> str:
+    metrics = _health_metrics(fin)
+    parts = []
+    for label, value, css in metrics:
+        cls = f' class="{css}"' if css else ""
+        parts.append(f'<dl class="metric"><dt>{label}</dt><dd{cls}>{value}</dd></dl>')
+    return f'<div class="grid four">{"".join(parts)}</div>'
+
+
+def _future_growth_html(profile: dict) -> str:
+    market = profile.get("market", {})
+    drivers = market.get("growth_drivers", [])
+    tam = _escape(market.get("tam", "N/A"))
+    tam_src = _escape(market.get("tam_source", ""))
+    key_engine = _escape(drivers[0] if drivers else "See company IR")
+    key_detail = _escape(", ".join(drivers[1:3]) if len(drivers) > 1 else (market.get("trends", [""])[0]))
+    return (
+        '<div class="grid two">'
+        f'<div class="metric"><dt>TAM cited by company</dt><dd>{tam}</dd><small>{tam_src}</small></div>'
+        f'<div class="metric"><dt>Key growth engine</dt><dd>{key_engine}</dd><small>{key_detail}</small></div>'
+        "</div>"
+    )
 
 
 def _build_vars(profile: dict, app_root: Path) -> dict:
@@ -199,14 +453,14 @@ def _build_vars(profile: dict, app_root: Path) -> dict:
     thesis = profile.get("thesis", {})
 
     ticker = profile.get("ticker", "")
+    currency = _profile_currency(fin)
     price = fin.get("price", 0)
-    cost = pos.get("cost_basis_usd", 0)
-    gain_pct = pos.get("unrealized_gain_pct", 0)
+    gain_pct = _position_gain_pct(pos)
     range_low = fin.get("52w_low", 0)
     range_high = fin.get("52w_high", 0)
     range_pos = fin.get("52w_position", 0)
     health = fin.get("health_grade", "C")
-    health_summary = fin.get("health_summary", "Deep Rich health script flags this holding.")
+    health_summary = fin.get("health_summary") or fin.get("health_note") or "Deep Rich health script flags this holding."
     verdict = thesis.get("verdict", "HOLD")
     verdict_reason = thesis.get("verdict_reason", "")
     suggested_action = thesis.get("suggested_action", "")
@@ -217,25 +471,16 @@ def _build_vars(profile: dict, app_root: Path) -> dict:
     position_badge = "Held position" if qty > 0 else "No position"
 
     evidence = _evidence_chart(profile)
+    cost, cost_currency = _cost_per_share(pos, fin, qty)
+    gain_class = "gain" if gain_pct >= 0 else "loss"
 
-    # Pre-compute values to avoid brace conflicts in multi-line strings
     pos_value_thb = _fmt_currency(pos.get("market_value_thb", 0), "THB")
-    pos_value_usd = _fmt_currency(pos.get("market_value_usd", 0))
-    fx_rate = pos.get("fx_usd_thb", 0)
-    cost_fmt = _fmt_currency(cost)
-    gain_fmt = _fmt_pct(gain_pct)
-    range_low_fmt = _fmt_currency(range_low)
-    range_high_fmt = _fmt_currency(range_high)
-    revenue_fmt = _fmt_large(fin.get("fy2025_revenue", 0))
-    rev_growth_fmt = _fmt_pct(fin.get("fy2025_revenue_growth_yoy", 0))
-    fcf_fmt = _fmt_large(fin.get("free_cash_flow_q1_2026", 0))
-    fcf_margin_fmt = _fmt_pct(fin.get("free_cash_flow_margin_q1_2026", 0))
-    assets_fmt = _fmt_large(fin.get("latest_assets", 0))
-    liab_fmt = _fmt_large(fin.get("latest_liabilities", 0))
-    equity_fmt = _fmt_large(fin.get("latest_equity", 0))
-    de_ratio = fin.get("debt_equity", 0)
-    tam = _escape(profile.get("market", {}).get("tam", "N/A"))
-    tam_src = _escape(profile.get("market", {}).get("tam_source", ""))
+    pos_value_usd = pos.get("market_value_usd", 0)
+    fx_rate = pos.get("fx_usd_thb") or pos.get("fx_rate", 0)
+    if pos_value_usd and fx_rate:
+        fx_line = f"{_fmt_currency(pos_value_usd)} at USD/THB {fx_rate:.2f}"
+    else:
+        fx_line = "THB position — no USD conversion in profile"
 
     rel_profile = f".deep-rich/companies/{ticker}.json"
 
@@ -252,20 +497,16 @@ def _build_vars(profile: dict, app_root: Path) -> dict:
         "{{logo_html}}": _logo_html(profile, app_root),
         "{{identity_tags_html}}": _identity_tags(profile),
         # Quote card
-        "{{current_price}}": _fmt_currency(price),
-        "{{gain_pct}}": gain_fmt,
+        "{{current_price}}": _fmt_currency(price, currency),
+        "{{gain_pct}}": _fmt_pct(gain_pct),
         "{{quantity}}": f"{qty:.4f}",
-        "{{range_low}}": range_low_fmt,
-        "{{range_high}}": range_high_fmt,
+        "{{range_low}}": _fmt_currency(range_low, currency),
+        "{{range_high}}": _fmt_currency(range_high, currency),
         "{{range_position_pct}}": str(range_pos),
         "{{suggested_action}}": _escape(suggested_action),
         # Profile section
         "{{market_cap_label}}": _market_cap_label(profile),
-        "{{evidence_summary}}": _escape(
-            "The visual summarizes our current evidence: strong future/story and past growth, "
-            "mixed health due to leverage, weak dividend because Cloudflare does not fit an "
-            "income-stock profile, and valuation treated as a guardrail rather than a fair-value claim."
-        ),
+        "{{evidence_summary}}": _escape(_evidence_summary(profile)),
         "{{business_flow_html}}": _business_flow(profile),
         "{{evidence_chart_json}}": json.dumps(evidence),
         "{{evidence_fallback}}": _evidence_fallback(profile),
@@ -273,55 +514,30 @@ def _build_vars(profile: dict, app_root: Path) -> dict:
         "{{valuation_html}}": (
             '<div class="grid three">'
             f"<dl class=\"metric\"><dt>Position value</dt><dd>{pos_value_thb}</dd>"
-            f"<small>{pos_value_usd} at USD/THB {fx_rate:.2f}</small></dl>"
-            f"<dl class=\"metric\"><dt>Cost basis</dt><dd>{cost_fmt}</dd><small>Per share</small></dl>"
-            f"<dl class=\"metric\"><dt>Unrealized gain</dt><dd class=\"gain\">{gain_fmt}</dd>"
+            f"<small>{fx_line}</small></dl>"
+            f"<dl class=\"metric\"><dt>Cost basis</dt><dd>{_fmt_currency(cost, cost_currency)}</dd>"
+            "<small>Per share</small></dl>"
+            f"<dl class=\"metric\"><dt>Unrealized gain</dt><dd class=\"{gain_class}\">{_fmt_pct(gain_pct)}</dd>"
             "<small>Not a sell signal by itself</small></dl>"
             "</div>"
             "<div class=\"callout warning\">Missing before strong add decision: current market cap "
             "verification, P/S or EV/Sales, peer valuation table, and explicit valuation threshold.</div>"
         ),
         # Future growth
-        "{{future_growth_html}}": (
-            '<div class="grid two">'
-            f"<div class=\"metric\"><dt>TAM cited by company</dt><dd>{tam}</dd>"
-            f"<small>{tam_src}</small></div>"
-            "<div class=\"metric\"><dt>Key growth engine</dt><dd>AI + edge developers</dd>"
-            "<small>Workers, AI Gateway, Zero Trust</small></div>"
-            "</div>"
-        ),
+        "{{future_growth_html}}": _future_growth_html(profile),
         # Past performance
-        "{{past_performance_html}}": (
-            "<table>"
-            "<thead><tr><th>Metric</th><th>Value</th><th>Read</th></tr></thead><tbody>"
-            f"<tr><td>FY2025 revenue</td><td>{revenue_fmt}</td>"
-            "<td>Large, still compounding software base</td></tr>"
-            f"<tr><td>Revenue growth YoY</td><td>{rev_growth_fmt}</td>"
-            "<td>Strong growth</td></tr>"
-            f"<tr><td>Q1 2026 free cash flow</td><td>{fcf_fmt}</td>"
-            "<td>Cash generation improving</td></tr>"
-            f"<tr><td>FCF margin</td><td>{fcf_margin_fmt}</td>"
-            "<td>Positive but still maturing</td></tr>"
-            "</tbody></table>"
-        ),
+        "{{past_performance_html}}": _past_performance_html(fin),
         # Financial health
         "{{health_summary}}": _escape(health_summary),
         "{{health_grade}}": health,
-        "{{health_html}}": (
-            '<div class="grid four">'
-            f"<dl class=\"metric\"><dt>Assets</dt><dd>{assets_fmt}</dd></dl>"
-            f"<dl class=\"metric\"><dt>Liabilities</dt><dd>{liab_fmt}</dd></dl>"
-            f"<dl class=\"metric\"><dt>Equity</dt><dd>{equity_fmt}</dd></dl>"
-            f"<dl class=\"metric\"><dt>Debt / Equity</dt><dd class=\"loss\">{de_ratio:.2f}x</dd></dl>"
-            "</div>"
-        ),
+        "{{health_html}}": _health_html(fin),
         # Thesis
         "{{verdict_reason}}": _escape(verdict_reason),
         "{{bull_case_html}}": _li(bull),
         "{{bear_case_html}}": _li(bear),
         # Risks + competitors
         "{{risks_catalysts_html}}": _risks_catalysts(profile),
-        "{{competitors_table_html}}": _competitors_table(profile.get("competitors", [])),
+        "{{competitors_table_html}}": _competitors_table(profile.get("competitors", []), ticker),
         # Data quality
         "{{data_quality_html}}": _data_quality(profile),
         # Footer
