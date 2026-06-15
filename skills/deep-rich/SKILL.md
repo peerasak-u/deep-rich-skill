@@ -1,0 +1,255 @@
+---
+name: deep-rich
+description: Portfolio manager for Thai SET, US stocks, Crypto, Gold, and Cash. Use when asking about portfolio status, allocation drift, stock fundamentals, deployment plans, investment decisions, rebalancing, or performance tracking.
+---
+
+# Deep Rich Portfolio Manager
+
+Private banking for normal people. A weekly portfolio review ritual with decision support, profit-taking signals, and opportunistic rebalancing.
+
+## Setup
+
+This skill is the agent workflow layer. The portfolio manager app and private data live outside this skill repo.
+
+Before any advice workflow, resolve the portfolio app root (`DEEP_RICH_HOME`) and run doctor. If doctor reports `blocked`, stop and fix/onboard data before recommending portfolio actions.
+
+```bash
+# Prefer the current working directory when pi is already running inside deep-rich.
+if [ -f scripts/dr.py ] && [ -d .deep-rich ]; then
+  export DEEP_RICH_HOME="$PWD"
+elif [ -n "${DEEP_RICH_HOME:-}" ] && [ -f "$DEEP_RICH_HOME/scripts/dr.py" ]; then
+  cd "$DEEP_RICH_HOME"
+else
+  echo "Set DEEP_RICH_HOME to the deep-rich portfolio manager repo, then retry."
+  exit 1
+fi
+
+# 1. Check data health and advice readiness
+python3 scripts/dr.py doctor
+
+# 2. If prices are stale or missing, refresh them
+python3 scripts/dr.py prices
+
+# 3. Optional: run the skill signals helper when DEEP_RICH_SKILL_HOME points at skills/deep-rich
+if [ -n "${DEEP_RICH_SKILL_HOME:-}" ]; then
+  uv run "$DEEP_RICH_SKILL_HOME/scripts/signals.py"
+fi
+```
+
+## Routing
+
+Map the user's intent to the right workflow. Don't ask which command — infer from what they said.
+
+| User says | Workflow | Reference |
+|-----------|----------|-----------|
+| "setup my portfolio" / "start Deep Rich" / "onboard me" | `onboard` | [onboard](references/commands/onboard.md) |
+| "is my data okay" / "health check" / "doctor" | `doctor` | [doctor](references/commands/doctor.md) |
+| "how's my portfolio" / "what should I do" / "review" | `review` | [review](references/commands/review.md) |
+| "what happened" / "any news" / "how's my portfolio after [event]" | `briefing` | [briefing](references/commands/briefing.md) |
+| "should I buy X" / "is X worth buying" / "what about X" | `research <SYM>` | [research](references/commands/research.md) |
+| "I have cash, where should I put it" / "deployment" | `deploy` | [deploy](references/commands/deploy.md) |
+| "should I rebalance" / "how do I fix my allocation" | `rebalance mechanical` | [rebalance](references/commands/rebalance.md) |
+| "I want to rotate [losers] to [opportunity]" | `rebalance rotate` | [rebalance](references/commands/rebalance.md) |
+| "why did I buy X" / "what was my thesis" / "log this decision" | `journal` | [journal](references/commands/journal.md) |
+| "what's my risk" / "what could hurt me" | `risk` | [risk](references/commands/risk.md) |
+| "am I on track" / "when will I hit X" / "set a goal" | `goals` | [goals](references/commands/goals.md) |
+
+### Multi-workflow patterns
+
+Some requests need chaining. Load multiple references:
+
+| Intent | Chain |
+|--------|-------|
+| "should I buy more MSFT" | `research MSFT` → check allocation → `deploy` → reason |
+| "portfolio review + what to buy" | `review` → `deploy` → synthesize |
+| "cut my losers and buy data center" | `rebalance rotate` → `research EGCO` → synthesize |
+
+## Commands
+
+| Command | Category | Description | Reference |
+|---------|----------|-------------|-----------|
+| `onboard` / `setup` | Bootstrap | Trust-first setup, fresh discovery, or existing asset-by-asset capture | [onboard](references/commands/onboard.md) |
+| `doctor` | Bootstrap | Read-only data health + advice readiness check | [doctor](references/commands/doctor.md) |
+| `review` | Weekly | Portfolio health + profit-taking + loss-cutting + actions | [review](references/commands/review.md) |
+| `briefing` | Event | Quick "what happened to my money" after events | [briefing](references/commands/briefing.md) |
+| `research <SYM>` | Decision | Stock analysis with bull/bear/verdict | [research](references/commands/research.md) |
+| `deploy` | Decision | Cash deployment to underweight classes | [deploy](references/commands/deploy.md) |
+| `rebalance` | Decision | Mechanical or rotate rebalancing | [rebalance](references/commands/rebalance.md) |
+| `journal` | Reflection | Decision tracking + pattern recognition | [journal](references/commands/journal.md) |
+| `risk` | Review | Concentration, quality, market risk assessment | [risk](references/commands/risk.md) |
+| `goals` | Planning | Goal tracking + trajectory analysis | [goals](references/commands/goals.md) |
+
+### Internal tools
+
+These CLI commands are used by workflows — not directly by users:
+
+| Command | Used by | Purpose |
+|---------|---------|---------|
+| `dr.py onboard` | setup | Guided fresh discovery or existing portfolio capture |
+| `dr.py setup` | setup | Alias for `onboard` |
+| `dr.py doctor` | all | Read-only data health + readiness gate |
+| `dr.py portfolio` | review, briefing, deploy | Current state + drift |
+| `dr.py performance` | review, journal | Gains/losses by holding |
+| `dr.py health <SYM>` | research, rebalance | Health grade |
+| `dr.py health watchlist` | review, rebalance | All health grades |
+| `dr.py fundamentals <SYM>` | research | Valuation, financials |
+| `dr.py news <SYM>` | briefing, research | News sentiment |
+| `dr.py deployment` | review, deploy | Cash allocation plan |
+| `dr.py prices` | all | Fresh price data |
+| `dr.py thai-561 <SYM>` | fundamentals | Thai SEC 56-1 data + download URL |
+| `signals.py` | review | Context-aware alerts |
+| `export_dashboard.py` | — | HTML dashboard |
+
+### Quick Examples
+
+```bash
+# Bootstrap / trust checks
+"setup my portfolio"           → runs onboard workflow
+"I already have some holdings" → runs onboard --existing flow
+"is my data okay?"             → runs doctor workflow
+
+# Weekly ritual
+"review my portfolio"          → runs review workflow
+"what should I do this week?"  → runs review workflow
+
+# After events
+"any news after WWDC?"         → runs briefing workflow
+"how's my portfolio doing?"    → runs briefing workflow
+
+# Decision support
+"should I buy EGCO?"           → runs research workflow
+"I have ฿200k to invest"       → runs deploy workflow
+
+# Rebalancing
+"rebalance my portfolio"       → runs rebalance mechanical
+"rotate my losers to data center" → runs rebalance rotate
+
+# Reflection
+"why did I buy NSL?"           → runs journal workflow
+"what's my biggest risk?"      → runs risk workflow
+"am I on track for ฿3M?"       → runs goals workflow
+```
+
+## Profit-Taking Rules
+
+The NSL lesson: +60% → +0.2% without taking profit. These rules prevent that:
+
+| Gain | Action | Rule |
+|------|--------|------|
+| > +100% | **Strongly consider selling 50%** | Take initial investment off the table |
+| > +50% | **Consider trimming 25-50%** | Lock in gains, let rest ride |
+| > +30% | **Watch closely** | Set mental trailing stop |
+
+These are suggestions, not mandates. The user decides.
+
+## Loss-Cutting Rules
+
+| Health | Loss | Action |
+|--------|------|--------|
+| F | Any | **Cut losses** — sell within 1 month |
+| D | > -20% | **Seriously consider cutting** — thesis likely broken |
+| D | < -20% | **Watch closely** — set alert |
+| C | > -30% | **Review thesis** — is the story still valid? |
+
+## Asset Classes
+
+| Class | Target | Currency | Behavior |
+|-------|--------|----------|----------|
+| Thai SET | 25% | THB | Active — grow toward target |
+| US Market | 35% | USD | Active — growth engine |
+| Crypto | 10% | USD | Active — BTC+ETH bucket |
+| Gold | 10% | THB | Passive — hold steady |
+| Cash | 20% | THB+USD | Active — deploy source |
+
+## Drift Indicators
+
+| Icon | Range | Meaning |
+|------|-------|---------|
+| 🟢 | < 5% | On track |
+| 🟡 | 5-15% | Needs attention |
+| 🔴 | > 15% | Significant rebalancing |
+
+## Guards
+
+Hard rules. Enforce these on every workflow.
+
+### Trust-first onboarding
+- If the user has no idea what to invest in, **do not force investing**. Help them discover assets, risks, and thesis candidates.
+- Existing portfolio setup is **asset-by-asset**. Ask "tell me one thing you currently hold"; never demand a full holdings list.
+- Missing thesis is acceptable. Mark it as unknown and research before buy/sell pressure.
+- Run `dr.py doctor` before serious advice. If advice mode is `blocked`, fix data first.
+
+### Emergency floor
+- **฿300,000 THB** — never recommend deploying below this threshold
+- If deployment plan would breach the floor, reduce allocation and warn
+
+### Stale data
+- Prices older than 24 hours: **warn before interpreting**
+- Snapshot without fresh prices: **always run `dr.py prices` first**
+- If price fetch fails, show last-known prices with timestamp and caveat
+
+### Currency display
+- **All aggregates in THB** — the portfolio total, drift, deployment
+- When showing individual US/crypto positions, include both USD and THB
+- FX rate: show USD/THB rate used for conversion
+
+### Position sizing
+- If any single stock exceeds **15% of its asset class**, flag it
+- If any single stock exceeds **5% of total portfolio**, flag it
+- Don't recommend selling — just surface the concentration risk
+
+### Gold is passive
+- Never recommend buying or selling gold for rebalancing
+- Gold drift is informational only
+
+### Cash is the source
+- Cash is where deployment funds come from, not a rebalancing target
+- Never recommend "increase cash allocation"
+
+### Don't force actions
+- Suggest, don't pressure. It's their money.
+- Show your work: always show the numbers behind each suggestion
+- Respect the user's decision even if you disagree
+
+## Data Sources
+
+| Market | Source | Data |
+|--------|--------|------|
+| Thai SET | Yahoo Finance (.BK) | Price, 52W range |
+| Thai SET | SET Factsheet | P/E, P/BV, Market Cap, ESG |
+| Thai SET | Thai SEC 56-1 | Financial statements, ratios, dividends |
+| Thai SET | Thai SEC (via browser) | Download PDF from market.sec.or.th |
+| US Market | Yahoo Finance | Price, 52W range |
+| US Market | SEC EDGAR | 10-K/10-Q, XBRL financials |
+| Crypto | CoinGecko | BTC, ETH prices |
+| FX | Open Exchange Rates | USD/THB |
+
+## Files
+
+All portfolio artifacts live in `.deep-rich/`:
+
+| File | Purpose |
+|------|--------|
+| `.deep-rich/portfolio.json` | Edit to add/modify holdings |
+| `.deep-rich/config.json` | Settings (emergency floor) |
+| `.deep-rich/prices.json` | Cached prices (auto-updated) |
+| `.deep-rich/snapshots/` | Portfolio snapshots (on `--snapshot`) |
+| `.deep-rich/journal.md` | Decision journal |
+| `.deep-rich/goals.json` | Financial goals |
+| `.deep-rich/data/thesis.json` | Captured asset thesis + conviction |
+| `.deep-rich/onboarding/` | Onboarding drafts + backups |
+| `.deep-rich/reviews/` | Saved portfolio reviews |
+| `.deep-rich/companies/` | Company research profiles (JSON) |
+| `CONTEXT.md` | Domain glossary |
+| `scripts/dr.py` | Main CLI in the portfolio manager app |
+| `scripts/fundamentals.py` | SEC EDGAR + Yahoo in the portfolio manager app |
+| `scripts/export_dashboard.py` | Dashboard export in the portfolio manager app |
+| `dashboard/dashboard.html` | Self-contained dashboard in the portfolio manager app |
+| `skills/deep-rich/` | This skill package; keep agent workflow docs and helpers here |
+
+## References
+
+- [Onboard](references/commands/onboard.md) — Trust-first setup and discovery
+- [Doctor](references/commands/doctor.md) — Data health + advice readiness
+- [Command docs](references/commands/) — Workflow-specific command documentation
+- [Data Sources](references/DATA-SOURCES.md) — API details and setup
