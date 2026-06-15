@@ -1,40 +1,38 @@
 # Portfolio Rules
 
-Decision-support rules for reviews, deployment, and rebalancing. Suggestions, not mandates — the user decides.
+Decision support — suggestions not mandates. NSL lesson: +60% → +0.2% without taking profit.
 
 ## Profit-taking
 
-The NSL lesson: +60% → +0.2% without taking profit.
-
-| Gain | Action | Rule |
-|------|--------|------|
-| > +100% | **Strongly consider selling 50%** | Take initial investment off the table |
-| > +50% | **Consider trimming 25-50%** | Lock in gains, let rest ride |
-| > +30% | **Watch closely** | Set mental trailing stop |
+| Gain | Action |
+|------|--------|
+| > +100% | Strongly consider sell 50% — initial off table |
+| > +50% | Consider trim 25–50% — lock gains |
+| > +30% | Watch — mental trailing stop |
 
 ## Loss-cutting
 
 | Health | Loss | Action |
 |--------|------|--------|
-| F | Any | **Cut losses** — sell within 1 month |
-| D | > -20% | **Seriously consider cutting** — thesis likely broken |
-| D | < -20% | **Watch closely** — set alert |
-| C | > -30% | **Review thesis** — is the story still valid? |
+| F | Any | Cut — sell within 1 month |
+| D | > −20% | Seriously consider cut — thesis likely broken |
+| D | < −20% | Watch — set alert |
+| C | > −30% | Review thesis — story still valid? |
 
 ## Asset classes
 
 | Class | Target | Currency | Behavior |
 |-------|--------|----------|----------|
-| Thai SET | 25% | THB | Active — grow toward target |
-| US Market | 35% | USD | Active — growth engine |
-| Crypto | 10% | USD | Active — BTC+ETH bucket |
-| Gold | 10% | THB | Passive — hold steady |
-| Cash | 20% | THB+USD | Active — deploy source |
+| Thai SET | 25% | THB | Active |
+| US Market | 35% | USD | Active |
+| Crypto | 10% | USD | Active — BTC+ETH |
+| Gold | 10% | THB | Passive |
+| Cash | 20% | THB+USD | Deploy source |
 
-## Drift indicators
+## Drift
 
 | Icon | Range | Meaning |
 |------|-------|---------|
 | 🟢 | < 5% | On track |
-| 🟡 | 5-15% | Needs attention |
-| 🔴 | > 15% | Significant rebalancing |
+| 🟡 | 5–15% | Monitor |
+| 🔴 | > 15% | Rebalance needed |
