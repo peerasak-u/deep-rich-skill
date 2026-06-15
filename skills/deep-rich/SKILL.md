@@ -34,7 +34,7 @@ Map the user's intent to the right workflow. Don't ask which command and don't e
 | "is my data okay" / "health check" / "doctor" | `doctor` | [doctor](references/commands/doctor.md) |
 | "how's my portfolio" / "what should I do" / "review" | `review` | [review](references/commands/review.md) |
 | "what happened" / "any news" / "how's my portfolio after [event]" | `briefing` | [briefing](references/commands/briefing.md) |
-| "should I buy X" / "is X worth buying" / "what about X" | `research <SYM>` | [research](references/commands/research.md) |
+| "update skills" / "sync skills" / "refresh deep-rich" | `update` | [update](references/commands/update.md) |
 | "I onboarded holdings / finish setup" | `onboard` → `doctor` → profile backfill via `research <SYM>` for held stocks | [onboard](references/commands/onboard.md), [research](references/commands/research.md) |
 | "I have cash, where should I put it" / "deployment" | `deploy` | [deploy](references/commands/deploy.md) |
 | "should I rebalance" / "how do I fix my allocation" | `rebalance mechanical` | [rebalance](references/commands/rebalance.md) |
@@ -63,6 +63,7 @@ These names are for agents reading this skill, tests, and workflow documentation
 | `doctor` | Bootstrap | Read-only data health + advice readiness check | [doctor](references/commands/doctor.md) |
 | `review` | Weekly | Portfolio health + profit-taking + loss-cutting + actions | [review](references/commands/review.md) |
 | `briefing` | Event | Quick "what happened to my money" after events | [briefing](references/commands/briefing.md) |
+| `update` | Maintenance | Sync skills from deep-rich-skill repo | [update](references/commands/update.md) |
 | `research <SYM>` | Decision / Data prep | Stock analysis with bull/bear/verdict; creates reusable `.deep-rich/companies/<SYM>.json` and visual `company/<symbol>.html` profiles after onboarding | [research](references/commands/research.md) |
 | `deploy` | Decision | Cash deployment to underweight classes | [deploy](references/commands/deploy.md) |
 | `rebalance` | Decision | Mechanical or rotate rebalancing | [rebalance](references/commands/rebalance.md) |
