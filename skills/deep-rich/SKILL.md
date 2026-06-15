@@ -7,38 +7,24 @@ description: Portfolio manager for Thai SET, US stocks, Crypto, Gold, and Cash. 
 
 Private banking for normal people. A weekly portfolio review ritual with decision support, profit-taking signals, and opportunistic rebalancing.
 
-## Setup
+## Agent Contract
 
 This skill is the agent workflow layer. The portfolio manager app and private data live outside this skill repo.
 
-Before any advice workflow, resolve the portfolio app root (`DEEP_RICH_HOME`) and run doctor. If doctor reports `blocked`, stop and fix/onboard data before recommending portfolio actions.
+The user-facing contact point is always **human → agent**. Do not tell users to run `dr.py` commands as the primary interface. Infer their intent from natural language, run the required scripts underneath the workflow, then explain results and next choices in human terms.
 
-```bash
-# Prefer the current working directory when pi is already running inside deep-rich.
-if [ -f scripts/dr.py ] && [ -d .deep-rich ]; then
-  export DEEP_RICH_HOME="$PWD"
-elif [ -n "${DEEP_RICH_HOME:-}" ] && [ -f "$DEEP_RICH_HOME/scripts/dr.py" ]; then
-  cd "$DEEP_RICH_HOME"
-else
-  echo "Set DEEP_RICH_HOME to the deep-rich portfolio manager repo, then retry."
-  exit 1
-fi
+Before any advice workflow:
 
-# 1. Check data health and advice readiness
-python3 scripts/dr.py doctor
-
-# 2. If prices are stale or missing, refresh them
-python3 scripts/dr.py prices
-
-# 3. Optional: run the skill signals helper when DEEP_RICH_SKILL_HOME points at skills/deep-rich
-if [ -n "${DEEP_RICH_SKILL_HOME:-}" ]; then
-  uv run "$DEEP_RICH_SKILL_HOME/scripts/signals.py"
-fi
-```
+1. Resolve the portfolio app root (`DEEP_RICH_HOME`, current app directory, or sibling `../deep-rich`).
+2. Verify it contains both `scripts/dr.py` and `.deep-rich/`.
+3. Run `python3 scripts/dr.py doctor` as an internal readiness gate.
+4. If doctor reports `blocked`, stop and help fix/onboard data before recommending portfolio actions.
+5. If prices are stale or missing, run `python3 scripts/dr.py prices` internally before interpreting the portfolio.
+6. Optionally run `skills/deep-rich/scripts/signals.py` for context-aware alerts when available.
 
 ## Routing
 
-Map the user's intent to the right workflow. Don't ask which command — infer from what they said.
+Map the user's intent to the right workflow. Don't ask which command and don't expose scripts as the UX — infer from what they said.
 
 | User says | Workflow | Reference |
 |-----------|----------|-----------|
@@ -64,7 +50,9 @@ Some requests need chaining. Load multiple references:
 | "portfolio review + what to buy" | `review` → `deploy` → synthesize |
 | "cut my losers and buy data center" | `rebalance rotate` → `research EGCO` → synthesize |
 
-## Commands
+## Internal Workflow Commands
+
+These names are for agents reading this skill, tests, and workflow documentation. They are not the user's interface; the user's interface is a conversation with the agent.
 
 | Command | Category | Description | Reference |
 |---------|----------|-------------|-----------|
@@ -79,9 +67,9 @@ Some requests need chaining. Load multiple references:
 | `risk` | Review | Concentration, quality, market risk assessment | [risk](references/commands/risk.md) |
 | `goals` | Planning | Goal tracking + trajectory analysis | [goals](references/commands/goals.md) |
 
-### Internal tools
+### Script tools
 
-These CLI commands are used by workflows — not directly by users:
+These CLI commands are implementation details used by workflows — not directly by users:
 
 | Command | Used by | Purpose |
 |---------|---------|---------|
@@ -226,7 +214,7 @@ Hard rules. Enforce these on every workflow.
 
 ## Files
 
-All portfolio artifacts live in `.deep-rich/`:
+All portfolio artifacts live in the portfolio manager app's `.deep-rich/` directory:
 
 | File | Purpose |
 |------|--------|

@@ -2,11 +2,11 @@
 
 Portfolio management workflow for AI coding agents. Decision support, profit-taking signals, rebalancing, and weekly review rituals for Thai SET, US stocks, Crypto, Gold, and Cash.
 
-> **Quick start:** Set `DEEP_RICH_HOME` to your portfolio manager app root, then run `python3 scripts/dr.py doctor` before any advice workflow. See [SKILL.md](skills/deep-rich/SKILL.md) for the full routing table.
+> **Quick start:** Install the skill, then talk to the agent: “review my portfolio”, “is my data okay?”, or “should I buy EGCO?”. The underlying scripts are internal workflow tools; users should not need to know or run them directly.
 
 ## Why Deep Rich?
 
-Most portfolio tools show you numbers. Deep Rich helps you think — and act. It wraps a portfolio manager app with structured advice workflows, guardrails, and a profit-taking signal engine so agents can give useful guidance without pressure or speculation.
+Most portfolio tools show you numbers. Deep Rich helps you think — and act. It gives agents structured advice workflows, guardrails, and a profit-taking signal engine so the first contact point is human → agent, not human → script.
 
 ## What's Included
 
@@ -29,13 +29,15 @@ Pi skill that routes natural language to the right portfolio workflow:
 
 See [SKILL.md](skills/deep-rich/SKILL.md) for the full routing table, guardrails, and workflow details.
 
-### Helper Scripts
+### Internal Helpers
+
+The skill includes lightweight helper scripts for agents and developers. They are implementation details used underneath the natural-language workflows, not user-facing commands.
 
 ```bash
-# Probe the portfolio manager app root
+# Agent/dev diagnostic: probe the portfolio manager app root
 uv run skills/deep-rich/scripts/probe.py --json
 
-# Build context-aware portfolio signals
+# Agent/dev diagnostic: build context-aware portfolio signals
 uv run skills/deep-rich/scripts/signals.py --home /path/to/deep-rich --json
 ```
 
@@ -86,7 +88,9 @@ If your portfolio manager app lives at `../deep-rich`, add this repo as a packag
 
 ## Usage
 
-Once installed, the skill activates when your request matches a routing pattern. Example sessions:
+Once installed, start with normal language. The agent infers the workflow, resolves the app root, runs readiness checks, calls the required internal scripts, and explains the result in human terms.
+
+Example sessions:
 
 ```
 "review my portfolio"          → runs review workflow
@@ -96,7 +100,7 @@ Once installed, the skill activates when your request matches a routing pattern.
 "what's my biggest risk?"     → runs risk workflow
 ```
 
-Before any advice workflow, the skill runs `dr.py doctor` to check data health. If the check is blocked, it stops and asks you to fix the data first.
+Behind the scenes, the agent runs a data-health check before any serious advice workflow. If advice is blocked, it stops and helps you fix or onboard the missing data before recommending actions.
 
 ## Guardrails
 
