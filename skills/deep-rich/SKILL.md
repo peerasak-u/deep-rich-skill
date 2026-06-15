@@ -237,6 +237,34 @@ Open specific pages for detailed research:
 | Thai stock with limited English | `web_search` + Thai terms |
 | Sentiment from discussions | `web_search` for Reddit/Twitter |
 
+### Conviction Test (Agentic)
+
+The `conviction_test.py` script tests whether your investment thesis is still valid.
+
+**The good parts** (keep as script):
+- Price performance checks (1Y return)
+- P&L calculation from buy price
+- Verdict algorithm (INTACT/DAMAGED/BROKEN/UNCERTAIN)
+
+**Improved** (agentic news):
+- News sentiment now uses `web_search` instead of keyword matching
+- Use `test_conviction_with_sentiment()` with agentic results
+
+**Agent workflow for conviction test:**
+```
+1. web_search: "[SYM] stock news this week"
+2. Analyze sentiment natively (context, nuance, risks)
+3. Call conviction test with results:
+   agentic_sentiment = {
+       "overall": "positive",  # positive/negative/neutral/mixed
+       "positive_count": 5,
+       "negative_count": 1,
+       "key_findings": ["AI growth", "earnings beat"],
+       "risks_mentioned": ["competition"]
+   }
+   test_conviction_with_sentiment(SYM, thesis, holding, agentic_sentiment)
+```
+
 ### Old `news.py` (Deprecated)
 
 The `scripts/news.py` script used Google News RSS + keyword matching.

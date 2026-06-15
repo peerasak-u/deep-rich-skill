@@ -189,3 +189,5 @@ User: "I'm buying EGCO because data center trend"
 - `dr.py health <SYM>` — quality check
 - `dr.py performance` — check outcomes
 - File read/write — `.deep-rich/journal.md`
+- `web_search` — news discovery for conviction tests
+- `test_conviction_with_sentiment()` — conviction test with agentic sentiment
