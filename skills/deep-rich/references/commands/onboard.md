@@ -101,3 +101,36 @@ python3 scripts/dr.py doctor
 ```
 
 If doctor says data is limited or blocked, fix data or research thesis before review/deploy/rebalance advice.
+
+### Post-onboard company profile backfill
+
+Once the user confirms the onboarding draft and `doctor` can read the live portfolio, build reusable company profiles for held stocks before the first serious review/deploy/rebalance workflow.
+
+This is the right slot for Simply Wall St-style company profile research because:
+
+1. onboarding has discovered the user's actual holdings,
+2. `doctor` has verified `.deep-rich/` exists and advice readiness is known,
+3. the agent can identify which holdings need profile data, and
+4. later workflows can reuse `.deep-rich/companies/<SYM>.json` instead of re-fetching everything.
+
+Process:
+
+```text
+onboard draft → user confirms apply → doctor readiness gate → company profile backfill for held stocks → review/deploy/rebalance
+```
+
+For each non-cash holding:
+
+1. Check whether `.deep-rich/companies/<SYM>.json` exists.
+2. If missing or stale, run the `research <SYM>` workflow.
+3. Use app fetchers first: `prices`, `fundamentals <SYM>`, `health <SYM>`, and Thai 56-1 helpers where relevant.
+4. Fill factual profile sections first: business, market, competitors, historical financials, risks, management/ownership if available, data freshness.
+5. Label forecast/model-heavy fields as estimates, or leave them unknown when no reliable source exists.
+6. Mark any blank onboarding thesis as `needs_research: true` until the profile has enough evidence.
+
+Do not block onboarding on full research. If the user has many holdings, prioritize:
+
+1. holdings with unknown thesis,
+2. largest positions by portfolio weight,
+3. loss-making positions,
+4. positions with stale/missing fundamentals.

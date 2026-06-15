@@ -9,22 +9,30 @@ Decision support for buy/sell — comprehensive stock analysis with verdict. Pro
 - When user mentions a stock they're watching
 - Before any buy/sell decision
 
-## Output artifact
+## Output artifacts
 
-Every research produces `.deep-rich/companies/<SYM>.json` — a structured company profile. This saves research cost: future sessions can read the profile instead of re-searching.
+Every research produces two artifacts:
 
-Check if profile exists before researching:
+1. `.deep-rich/companies/<SYM>.json` — structured company profile data. This saves research cost: future sessions can read the profile instead of re-searching.
+2. `company/<symbol-lower>.html` — user-facing visual company profile, styled with the shared [Deep Rich report design system](../DESIGN.md).
+
+Check if profile data exists before researching:
+
 ```bash
 test -f .deep-rich/companies/<SYM>.json && cat .deep-rich/companies/<SYM>.json
 ```
 
-If profile exists and `updated_at` is <7 days old, use it. Otherwise, refresh.
+If profile exists and `meta.updated_at` is <7 days old, use it as the base. Refresh prices, health, and recent news before updating the HTML. Otherwise, refresh the JSON first, then regenerate the HTML.
+
+The HTML is not optional when the user asks for a company profile or when post-onboard profile backfill is being tested. It should be the artifact the user opens and reads.
+
+Before generating the HTML, resolve the company logo from the local `.deep-rich` cache. If no trusted logo has been downloaded yet, attempt logo discovery/download using the source priority in [DATA-SOURCES](../DATA-SOURCES.md#company-logos), save it under `.deep-rich/company-assets/logos/`, and record metadata in the profile JSON. If logo discovery fails, use a generated ticker tile and record `logo` as unknown/missing in `data_quality`.
 
 ---
 
 ## Research Checklist
 
-Follow this checklist in order. Each item has a data source and required fields.
+Follow this checklist in order. Each item has a data source and required fields. If a required field cannot be fetched, keep the field in the JSON/HTML and mark it `unknown` with a short reason; do not silently omit sections.
 
 ### 1. Basic Info
 
@@ -36,6 +44,7 @@ Follow this checklist in order. Each item has a data source and required fields.
 | Sector/Industry | Yahoo Finance or SEC | ✅ |
 | Country | SEC EDGAR | ✅ |
 | Website | SEC EDGAR | Optional |
+| Logo source/path | Official website or logo provider; see [DATA-SOURCES](../DATA-SOURCES.md#company-logos) | Optional |
 
 ```bash
 python3 scripts/dr.py fundamentals <SYM>
@@ -159,6 +168,30 @@ web_search: "<company name> regulatory challenges"
 | Reasoning | Synthesis | ✅ |
 | Suggested action | Synthesis | ✅ |
 
+### 10. Management & Ownership
+
+| Field | Source | Required |
+|-------|--------|----------|
+| CEO / key executives | SEC filing, annual report, company site | Optional but keep section |
+| Board independence / governance notes | SEC proxy, annual report | Optional but keep section |
+| Insider ownership / recent insider activity | SEC Form 4 / proxy / reputable data | Optional but keep section |
+| Institutional ownership | 13F / reputable data provider | Optional but keep section |
+
+If unavailable, mark as `unknown` and explain which source should be checked next.
+
+### 11. Data Quality & Freshness
+
+| Field | Source | Required |
+|-------|--------|----------|
+| Facts list | Research notes | ✅ |
+| Calculated metrics list | App scripts / visible formulas | ✅ |
+| Estimates list | Analyst/management/model sources | ✅ |
+| Unknown or missing fields | Research notes | ✅ |
+| Last updated | Agent runtime date | ✅ |
+| Source log | Commands + URLs/searches | ✅ |
+
+Always separate `facts`, `calculated`, `estimates`, `interpretations`, and `unknowns`. Forecasts, TAM, analyst targets, fair value, future growth, and management guidance are estimates unless independently modeled with visible assumptions.
+
 ---
 
 ## Decision Rules
@@ -179,9 +212,30 @@ Additional signals:
 
 ---
 
-## Output: Company Profile
+## Output: Company Profile Data
 
-Save to `.deep-rich/companies/<SYM>.json`:
+Save to `.deep-rich/companies/<SYM>.json`.
+
+The JSON should contain these top-level sections every time:
+
+| Key | Required | Purpose |
+|---|---:|---|
+| `ticker`, `name`, `exchange`, `sector`, `industry`, `country`, `website` | ✅ | Basic identity |
+| `logo` | Optional | Local cached logo path, source URL, confidence, license note |
+| `business` | ✅ | Description, products, revenue model, moat |
+| `market` | ✅ | TAM/trends/growth drivers, with estimate labels |
+| `competitors` | ✅ | Peer landscape |
+| `pipeline` / `catalysts` | ✅ | Upcoming product/business events; label estimates |
+| `financials` | ✅ | Price, range, revenue, earnings, balance sheet, health |
+| `position` | If held | Quantity, cost basis, market value, THB conversion, gain/loss |
+| `risks` | ✅ | Business, financial, valuation, data, governance risks |
+| `management` | ✅ | Executives/governance/ownership; use `unknown` if unavailable |
+| `thesis` | ✅ | Bull case, bear case, verdict, suggested action |
+| `data_quality` | ✅ | Facts, calculated, estimates, interpretations, unknowns |
+| `research_log` | ✅ | Commands, web searches, source URLs, dates |
+| `meta` | ✅ | first researched, updated at, depth, confidence |
+
+Example shape:
 
 ```json
 {
@@ -285,9 +339,53 @@ Save to `.deep-rich/companies/<SYM>.json`:
 
 ---
 
+## Output: Visual Company Profile HTML
+
+Generate `company/<symbol-lower>.html` from the JSON profile using the exporter script:
+
+```bash
+python3 skills/deep-rich/scripts/export_company_profile.py <SYM>
+```
+
+See [export.md](../commands/export.md) for full command reference and template variable contract.
+
+The agent/LLM is responsible for filling and validating the structured data. The script handles escaping, repeated HTML lists/tables, logo path resolution, and template substitution so style stays consistent.
+
+Use the shared [Deep Rich report design system](../DESIGN.md). The HTML must be a single file with embedded CSS unless the app provides a shared exporter.
+
+Required HTML sections:
+
+| Section | Required content |
+|---|---|
+| Top bar | Deep Rich brand, artifact type, updated date, source profile path |
+| Pill navigation | Anchors for overview, valuation, future growth, past performance, financial health, thesis, risks, data quality |
+| Hero / stock card | Company name, ticker, exchange, business one-liner, verdict badge, downloaded local logo from `.deep-rich` or generated ticker tile fallback |
+| Position snapshot | If held: quantity, cost basis, current value in native currency and THB, gain/loss |
+| Company overview | Business description, products/services, revenue model, moat |
+| Evidence map | Non-proprietary visual summary; do not call it Simply Wall St Snowflake scoring |
+| Valuation guardrail | Factual multiples and missing valuation data; no fair-value claim unless model is explicit |
+| Future growth | Estimate-labeled TAM, guidance, analyst expectations, product pipeline |
+| Past performance | Historical revenue, margin, cash flow, price range |
+| Financial health | Assets, liabilities, equity, debt/equity, cash/runway where available |
+| Thesis | Bull case, bear case, verdict, suggested action |
+| Risk analysis | Risk flags, catalysts, monitoring questions |
+| Management and ownership | Executives, board, insider/institutional ownership; mark unknown if unavailable |
+| Data quality boundary | Facts, calculated fields, estimates, interpretations, unknowns, source log |
+
+Visual consistency rules:
+
+- Match the dashboard light theme from [DESIGN](../DESIGN.md).
+- Prefer cards, fact strips, tables, pill badges, and a left-side section navigator for long company profiles.
+- Use Chart.js CDN when it makes the report clearer, especially for the evidence/radar map, price range, trend, or peer comparison visuals.
+- Use THB for aggregate portfolio/position value and native currency for stock-level prices.
+- Use explicit caveats for estimate-heavy sections.
+- Do not copy Simply Wall St branding, exact visuals, or proprietary scoring.
+
+---
+
 ## Synthesis Template
 
-After completing the checklist, present to the user:
+After completing the checklist and writing both artifacts, present to the user:
 
 ```
 ══════════════════════════════════════════════════════════════════════
@@ -323,7 +421,8 @@ After completing the checklist, present to the user:
   [Specific amount if buying, or reasoning if holding/avoiding]
   [How it fits your allocation strategy]
 
-  📁 Saved to .deep-rich/companies/<SYM>.json
+  📁 Data saved to .deep-rich/companies/<SYM>.json
+  🌐 Report saved to company/<symbol-lower>.html
 ```
 
 ---
@@ -401,7 +500,8 @@ If user decides to buy/sell, log to journal AND update the company profile:
   Don't add more. Monitor AMP-018 progress.
   If GLP-1 gets delayed/rejected, sell.
 
-  📁 Saved to .deep-rich/companies/AMPH.json
+  📁 Data saved to .deep-rich/companies/AMPH.json
+  🌐 Report saved to company/amph.html
 ```
 
 ---
@@ -410,10 +510,16 @@ If user decides to buy/sell, log to journal AND update the company profile:
 
 When the user asks to research a stock that already has a profile:
 
-1. Read the existing profile
-2. Check `meta.updated_at` — if >7 days old, refresh financials
-3. Check if there's new news (search for recent developments)
-4. Update changed fields
-5. Present to user
+1. Read the existing profile.
+2. Check `meta.updated_at` — if >7 days old, refresh financials.
+3. Always refresh prices before using position value or gain/loss.
+4. Check if there is new news or a recent earnings event.
+5. Update changed JSON fields.
+6. Regenerate `company/<symbol-lower>.html`:
 
-This saves research cost — you don't re-search everything every time.
+   ```bash
+   python3 skills/deep-rich/scripts/export_company_profile.py <SYM>
+   ```
+7. Present both artifact paths to the user.
+
+This saves research cost — you don't re-search everything every time, but the visual output stays current and consistent.

@@ -105,7 +105,24 @@ Present in this order:
 
 ### Step 6: Generate HTML review
 
-After synthesizing the review, generate an interactive HTML page:
+After synthesizing the review, generate an interactive HTML page.
+
+Before rendering, resolve local company logos for every stock shown in the review:
+
+1. Read `.deep-rich/companies/<SYM>.json.logo.path` when available.
+2. Verify the logo file exists under `.deep-rich/company-assets/logos/`.
+3. If missing, try the standard filename fallbacks: `<symbol-lower>.png`, `.webp`, `.jpg`, `.svg`.
+4. If still missing, leave `logo_path` null and render a generated ticker tile.
+5. Do not hotlink third-party logo URLs in review HTML.
+
+Use logos in:
+
+- profit-taking cards
+- loss-cutting cards
+- holdings action cards
+- holdings/performance tables
+- any top-position or concentration widgets
+
 
 ```bash
 # Pipe review data as JSON to export_review.py
@@ -131,6 +148,8 @@ Save the review data as JSON with this structure. Each stock memo includes resea
       "symbol": "NVDA",
       "gain_pct": 268.3,
       "position_label": "฿123k · cost ฿33k",
+      "logo_path": ".deep-rich/company-assets/logos/nvda.png",
+      "logo_source": "official_website",
       "action": "Sell 50%",
       "proceeds": 61000,
       "reason": "Detailed reasoning for the action...",
@@ -168,7 +187,7 @@ Save the review data as JSON with this structure. Each stock memo includes resea
 ```
 
 The HTML output is a blog-style investment memo:
-- Each stock gets its own card with thesis, research, and conviction checklist
+- Each stock gets its own card with thesis, research, conviction checklist, and local cached logo when available
 - Checklist items show pass/fail with visual indicators
 - Conviction levels (high/medium/low/broken) are color-coded
 - Drift bars show current vs target allocation

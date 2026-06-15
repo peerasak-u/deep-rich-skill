@@ -13,6 +13,8 @@ This skill is the agent workflow layer. The portfolio manager app and private da
 
 The user-facing contact point is always **human → agent**. Do not tell users to run `dr.py` commands as the primary interface. Infer their intent from natural language, run the required scripts underneath the workflow, then explain results and next choices in human terms.
 
+For generated HTML artifacts, follow the shared report design system in [DESIGN](references/DESIGN.md). Keep visual reports consistent with the Deep Rich dashboard theme and label facts, calculations, estimates, interpretations, and unknowns clearly.
+
 Before any advice workflow:
 
 1. Resolve the portfolio app root (`DEEP_RICH_HOME`, current app directory, or sibling `../deep-rich`).
@@ -33,6 +35,7 @@ Map the user's intent to the right workflow. Don't ask which command and don't e
 | "how's my portfolio" / "what should I do" / "review" | `review` | [review](references/commands/review.md) |
 | "what happened" / "any news" / "how's my portfolio after [event]" | `briefing` | [briefing](references/commands/briefing.md) |
 | "should I buy X" / "is X worth buying" / "what about X" | `research <SYM>` | [research](references/commands/research.md) |
+| "I onboarded holdings / finish setup" | `onboard` → `doctor` → profile backfill via `research <SYM>` for held stocks | [onboard](references/commands/onboard.md), [research](references/commands/research.md) |
 | "I have cash, where should I put it" / "deployment" | `deploy` | [deploy](references/commands/deploy.md) |
 | "should I rebalance" / "how do I fix my allocation" | `rebalance mechanical` | [rebalance](references/commands/rebalance.md) |
 | "I want to rotate [losers] to [opportunity]" | `rebalance rotate` | [rebalance](references/commands/rebalance.md) |
@@ -60,7 +63,7 @@ These names are for agents reading this skill, tests, and workflow documentation
 | `doctor` | Bootstrap | Read-only data health + advice readiness check | [doctor](references/commands/doctor.md) |
 | `review` | Weekly | Portfolio health + profit-taking + loss-cutting + actions | [review](references/commands/review.md) |
 | `briefing` | Event | Quick "what happened to my money" after events | [briefing](references/commands/briefing.md) |
-| `research <SYM>` | Decision | Stock analysis with bull/bear/verdict | [research](references/commands/research.md) |
+| `research <SYM>` | Decision / Data prep | Stock analysis with bull/bear/verdict; creates reusable `.deep-rich/companies/<SYM>.json` and visual `company/<symbol>.html` profiles after onboarding | [research](references/commands/research.md) |
 | `deploy` | Decision | Cash deployment to underweight classes | [deploy](references/commands/deploy.md) |
 | `rebalance` | Decision | Mechanical or rotate rebalancing | [rebalance](references/commands/rebalance.md) |
 | `journal` | Reflection | Decision tracking + pattern recognition | [journal](references/commands/journal.md) |
@@ -86,6 +89,7 @@ These CLI commands are implementation details used by workflows — not directly
 | `dr.py thai-561 <SYM>` | fundamentals | Thai SEC 56-1 data + download URL |
 | `signals.py` | review | Context-aware alerts |
 | `export_dashboard.py` | — | HTML dashboard |
+| `export_company_profile.py` | research | Company profile HTML from JSON + template |
 
 ### Quick Examples
 
@@ -301,7 +305,9 @@ All portfolio artifacts live in the portfolio manager app's `.deep-rich/` direct
 | `scripts/dr.py` | Main CLI in the portfolio manager app |
 | `scripts/fundamentals.py` | SEC EDGAR + Yahoo in the portfolio manager app |
 | `scripts/export_dashboard.py` | Dashboard export in the portfolio manager app |
+| `scripts/export_company_profile.py` | Company profile HTML export in the portfolio manager app |
 | `dashboard/dashboard.html` | Self-contained dashboard in the portfolio manager app |
+| `company/<sym>.html` | Visual company profile generated from JSON + template |
 | `skills/deep-rich/` | This skill package; keep agent workflow docs and helpers here |
 
 ## References

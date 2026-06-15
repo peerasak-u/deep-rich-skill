@@ -92,7 +92,7 @@ Never commit or create private portfolio artifacts in this repo:
 - `.deep-rich/prices.json`
 - `.deep-rich/reviews/`
 - API keys, account identifiers, broker data, or credentials
-- Hardcoded local absolute paths such as `/Users/...`
+- Hardcoded machine-specific absolute home paths
 
 If private data is needed, read it only from the resolved Deep Rich app root and keep generated artifacts there unless the user explicitly asks otherwise.
 
