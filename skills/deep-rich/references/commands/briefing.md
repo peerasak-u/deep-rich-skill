@@ -32,18 +32,28 @@ Note any big moves (>5% in a day or since last check).
 
 ### Step 3: Search news for YOUR holdings
 
-For each holding with significant news:
+**Use agentic tools — not `dr.py news`.** Let the agent pick the right source and depth.
 
+For quick pulse on holdings with big moves:
 ```
 web_search: "[SYM] stock news this week"
 web_search: "[SYM] earnings report"
 ```
 
 For the specific event the user mentioned:
-
 ```
 web_search: "[event] impact on stocks"
 web_search: "[event] announcements"
+```
+
+For Thai stocks (limited English coverage):
+```
+web_search: "[THAI COMPANY] ข่าว หุ้น ล่าสุด"
+```
+
+For deep dive (open earnings call, investor page):
+```
+agent_browser: open [earnings_link]
 ```
 
 Filter: only news that affects YOUR holdings. Don't report on stocks you don't own.
@@ -142,6 +152,5 @@ Present in this order:
 - `dr.py portfolio` — current holdings
 - `dr.py prices` — latest prices
 - `dr.py performance` — gains/losses
-- `dr.py news <SYM>` — news for specific holdings
-- `web_search` — news search for events
-- `agent_browser` — if user wants to check specific pages (earnings call, event page)
+- `web_search` — news discovery (default for news)
+- `agent_browser` — deep dive into earnings calls, investor pages, filings

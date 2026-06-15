@@ -81,7 +81,6 @@ These CLI commands are implementation details used by workflows — not directly
 | `dr.py health <SYM>` | research, rebalance | Health grade |
 | `dr.py health watchlist` | review, rebalance | All health grades |
 | `dr.py fundamentals <SYM>` | research | Valuation, financials |
-| `dr.py news <SYM>` | briefing, research | News sentiment |
 | `dr.py deployment` | review, deploy | Cash allocation plan |
 | `dr.py prices` | all | Fresh price data |
 | `dr.py thai-561 <SYM>` | fundamentals | Thai SEC 56-1 data + download URL |
@@ -199,7 +198,49 @@ Hard rules. Enforce these on every workflow.
 - Show your work: always show the numbers behind each suggestion
 - Respect the user's decision even if you disagree
 
-## Data Sources
+## News Discovery (Agentic)
+
+**Use the agent's native tools for news — not `dr.py news`.** Modern models can:
+- Search multiple sources simultaneously
+- Understand context, sarcasm, nuance
+- Read full articles, not just titles
+- Adapt to what's relevant for the situation
+
+### Default: `web_search`
+
+```
+web_search: "[COMPANY] stock news today"
+web_search: "[COMPANY] earnings [QUARTER]"
+web_search: "[COMPANY] [EVENT] impact"
+```
+
+For Thai stocks:
+```
+web_search: "[THAI COMPANY] ข่าวหุ้น ล่าสุด"
+```
+
+### Deep Dive: `agent_browser`
+
+Open specific pages for detailed research:
+- Investor relations / earnings press releases
+- SEC filings (10-K, 10-Q)
+- SET or SEC Thailand filings
+- Reddit, Twitter/X for retail sentiment
+
+### When to use each
+
+| Need | Tool |
+|------|------|
+| Quick pulse check | `web_search` x2-3 |
+| Event impact (earnings, WWDC) | `web_search` + synthesis |
+| Deep research before buy/sell | `agent_browser` open links |
+| Thai stock with limited English | `web_search` + Thai terms |
+| Sentiment from discussions | `web_search` for Reddit/Twitter |
+
+### Old `news.py` (Deprecated)
+
+The `scripts/news.py` script used Google News RSS + keyword matching.
+**It's deprecated.** Use agentic tools instead for better context understanding.
 
 | Market | Source | Data |
 |--------|--------|------|
