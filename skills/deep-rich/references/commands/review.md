@@ -232,10 +232,10 @@ Don't skip this. Every decision needs a record. The NSL lesson happened because 
 
 ## Guards
 
-- **Emergency floor**: Never suggest deploying below ฿300k
-- **Gold is passive**: Never suggest rebalancing gold
-- **Don't force actions**: Suggest, don't pressure. It's their money.
-- **Show your work**: Always show the numbers behind each suggestion
+Enforce [GUARDS](../GUARDS.md). Profit/loss and drift rules: [RULES](../RULES.md).
+
+Workflow-specific:
+
 - **No selling pressure**: If a stock is up 60% and they want to hold, respect it. Mention the option, don't push.
 
 ## Reference data

@@ -179,11 +179,14 @@ python3 scripts/dr.py health <SYM>
 
 ## Guards
 
+Enforce [GUARDS](../GUARDS.md).
+
+Workflow-specific:
+
 - **Don't over-trade**: Rebalancing has costs. Don't do it for tiny drifts.
 - **Tax awareness**: Selling triggers capital gains (in some jurisdictions)
 - **Diversification**: Don't concentrate everything in one theme
 - **Research first**: If rotating into new stocks, research them
-- **Emergency floor**: Never rebalance below ฿300k cash
 
 ## Tools used
 

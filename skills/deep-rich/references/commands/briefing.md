@@ -32,31 +32,13 @@ Note any big moves (>5% in a day or since last check).
 
 ### Step 3: Search news for YOUR holdings
 
-**Use agentic tools — not `dr.py news`.** Let the agent pick the right source and depth.
+Use agentic tools per [AGENTIC-NEWS](../AGENTIC-NEWS.md) — not `dr.py news`.
 
-For quick pulse on holdings with big moves:
-```
-web_search: "[SYM] stock news this week"
-web_search: "[SYM] earnings report"
-```
+Briefing-specific filters:
 
-For the specific event the user mentioned:
-```
-web_search: "[event] impact on stocks"
-web_search: "[event] announcements"
-```
-
-For Thai stocks (limited English coverage):
-```
-web_search: "[THAI COMPANY] ข่าว หุ้น ล่าสุด"
-```
-
-For deep dive (open earnings call, investor page):
-```
-agent_browser: open [earnings_link]
-```
-
-Filter: only news that affects YOUR holdings. Don't report on stocks you don't own.
+- Search holdings with big moves first, then the user-mentioned event
+- Only report news that affects **your** holdings — skip stocks you don't own
+- Keep it quick: 2–3 `web_search` queries per flagged holding; `agent_browser` only when a headline needs verification
 
 ### Step 4: Synthesize
 

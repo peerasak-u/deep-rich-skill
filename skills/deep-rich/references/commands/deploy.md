@@ -138,7 +138,10 @@ User: "I see data center trend in Thailand. Should I deploy there?"
 
 ## Guards
 
-- **Emergency floor**: Never deploy below ฿300k
+Enforce [GUARDS](../GUARDS.md).
+
+Workflow-specific:
+
 - **Dollar-cost average**: Don't deploy everything at once
 - **Diversification**: Don't put everything in one theme
 - **Research first**: If suggesting specific stocks, run research workflow
